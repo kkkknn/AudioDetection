@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">AudioDetection</string>
+    <string name="btn_show">绘制表格</string>
+    <string name="btn_start">测试开始</string>
+</resources>
