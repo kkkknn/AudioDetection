@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.text.TextPaint;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -15,7 +16,7 @@ import androidx.annotation.Nullable;
 import java.util.LinkedList;
 
 //图表自定义view
-public class ChartView extends SurfaceView implements SurfaceHolder.Callback {
+public class ChartViewFFT extends SurfaceView implements SurfaceHolder.Callback {
     private LinkedList<String> vertical_list;//垂直数据类别名称
     private LinkedList<String> horizontal_list;//水平数据类别名称
     private int vertical_interval;
@@ -28,25 +29,26 @@ public class ChartView extends SurfaceView implements SurfaceHolder.Callback {
     private Thread CanvasDraw;
     private boolean drawing=false;
 
+    private int mSpectrumNum = 48;
     private byte[] mBytes;
     private float[] mPoints;
 
-    public ChartView(Context context) {
+    public ChartViewFFT(Context context) {
         super(context);
         initView();
     }
 
-    public ChartView(Context context, AttributeSet attrs) {
+    public ChartViewFFT(Context context, AttributeSet attrs) {
         super(context, attrs);
         initView();
     }
 
-    public ChartView(Context context, AttributeSet attrs, int defStyleAttr) {
+    public ChartViewFFT(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         initView();
     }
 
-    public ChartView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+    public ChartViewFFT(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         initView();
     }
@@ -80,9 +82,17 @@ public class ChartView extends SurfaceView implements SurfaceHolder.Callback {
         mSurfaceHolder.addCallback(this);
     }
 
-    public void updateVisualizer(byte[] waveForm)
+    public void updateVisualizer(byte[] fft)
     {
-        mBytes = waveForm;
+        byte[] model = new byte[fft.length / 2 + 1];
+        model[0] = (byte) Math.abs(fft[0]);
+        for (int i = 2, j = 1; j < mSpectrumNum;)
+        {
+            model[j] = (byte) Math.hypot(fft[i], fft[i + 1]);
+            i += 2;
+            j++;
+        }
+        mBytes = model;
         invalidate();
     }
 
@@ -92,8 +102,10 @@ public class ChartView extends SurfaceView implements SurfaceHolder.Callback {
         //绘制背景
         canvas.drawColor(Color.WHITE);
         //绘制横纵2条直线
+        mPaint.setStrokeWidth(2f);
         canvas.drawLine(margin,(height-margin),margin,0,mPaint);
         canvas.drawLine(margin,(height-margin),width,(height-margin),mPaint);
+        mPaint.setStrokeWidth(6f);
         //绘制波形
         if (mBytes == null)
         {
@@ -103,13 +115,21 @@ public class ChartView extends SurfaceView implements SurfaceHolder.Callback {
         {
             mPoints = new float[mBytes.length * 4];
         }
-        for (int i = 0; i < mBytes.length - 1; i++) {
-            mPoints[i * 4] = (width-margin) * i / (mBytes.length - 1) + margin;
-            mPoints[i * 4 + 1] = (height-margin) / 2
-                    + ((byte) (mBytes[i] + 128)) * ((height-margin) / 2) / 128;
-            mPoints[i * 4 + 2] = (width-margin) * (i + 1) / (mBytes.length - 1) + margin;
-            mPoints[i * 4 + 3] = (height-margin) / 2
-                    + ((byte) (mBytes[i + 1] + 128)) * ((height-margin) / 2) / 128;
+        for (int i = 0; i < mSpectrumNum ; i++)
+        {
+            if (mBytes[i] < 0)
+            {
+                mBytes[i] = 127;
+            }
+
+            final int baseX = (width-margin)/mSpectrumNum;
+            final int xi = baseX*i + baseX/2 +margin;
+
+            mPoints[i * 4] = xi;
+            mPoints[i * 4 + 1] = height-margin;
+
+            mPoints[i * 4 + 2] = xi;
+            mPoints[i * 4 + 3] = height-margin - mBytes[i];
         }
         canvas.drawLines(mPoints, mPaint);
 

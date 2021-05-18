@@ -29,10 +29,12 @@
     </LinearLayout>
 
     <com.citrontek.audiodetection.view.ChartView
+        android:id="@+id/voice_view"
         android:layout_width="match_parent"
         android:layout_height="300dp" />
 
-    <com.citrontek.audiodetection.view.ChartView
+    <com.citrontek.audiodetection.view.ChartViewFFT
+        android:id="@+id/fft_view"
         android:layout_width="match_parent"
         android:layout_height="300dp"/>
 </LinearLayout>

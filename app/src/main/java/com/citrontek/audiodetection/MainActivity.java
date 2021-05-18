@@ -9,19 +9,32 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.media.MediaRecorder;
 import android.media.audiofx.Visualizer;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.ContactsContract;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.citrontek.audiodetection.recoder.RecorderManager;
+import com.citrontek.audiodetection.recoder.RecordingUtil;
+import com.citrontek.audiodetection.view.ChartView;
+import com.citrontek.audiodetection.view.ChartViewFFT;
+
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
-    private Button btn_test;
+    private Button btn_test,btn_recode;
     private MediaPlayer mediaPlayer;
     private Visualizer visualizer;
     private  static final int REQUEST_CODE=2223;
+    private boolean isRecoding;
+    private ChartView chartView;
+    private ChartViewFFT chartViewFFT;
+    private String filePath= "test.mp3";
+    private RecorderManager recorderManager;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -36,10 +49,19 @@ public class MainActivity extends AppCompatActivity {
                     new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_CODE);
         }
 
+
+    }
+
+    private void initPlay(){
         //初始化音频资源
         //mediaPlayer=new MediaPlayer();
         //mediaPlayer.setDataSource();
-        mediaPlayer=MediaPlayer.create(this, R.raw.test);
+        Uri uri = Uri.parse(getFilesDir()+filePath);
+        if(uri!=null){
+            mediaPlayer=MediaPlayer.create(this, uri);
+        }else {
+            mediaPlayer=MediaPlayer.create(this, R.raw.test5);
+        }
         mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
         mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
@@ -48,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.i(TAG, "onCompletion: 播放完成");
             }
         });
+
         //声明Visualizer
         visualizer = new Visualizer(mediaPlayer.getAudioSessionId());
         //设置采样大小
@@ -58,10 +81,7 @@ public class MainActivity extends AppCompatActivity {
              * 返回波形信息
              */
             public void onWaveFormDataCapture(Visualizer visualizer, byte[] waveform, int samplingRate) {
-                for (int i = 0; i < 20; i++) {
-
-                    Log.i("TAG", "onWaveFormDataCapture: "+waveform[i]+"||"+samplingRate);
-                }
+                chartView.updateVisualizer(waveform);
             }
 
             @Override
@@ -69,23 +89,10 @@ public class MainActivity extends AppCompatActivity {
              *返回经过fft变换后的信息
              */
             public void onFftDataCapture(Visualizer visualizer, byte[] fft, int samplingRate) 					{
-                    byte[] model = new byte[fft.length / 2 + 1];
-                    model[0] = (byte) Math.abs(fft[1]);
-                    int j = 1;
 
-                    for (int i = 2; i < 18;) {
-                        model[j] = (byte) Math.hypot(fft[i], fft[i + 1]);
-                        i += 2;
-                        j++;
-                    }
-                for (int i = 0; i < model.length; i++) {
-
-                    Log.i("TAG", "onWaveFormDataCapture: "+model[i]+"||"+samplingRate);
-                }
+                chartViewFFT.updateVisualizer(fft);
             }
-        }, Visualizer.getMaxCaptureRate() / 2, false, true);
-
-
+        }, Visualizer.getMaxCaptureRate() /2, true, true);
     }
 
     private void initView(){
@@ -93,17 +100,40 @@ public class MainActivity extends AppCompatActivity {
         btn_test.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(mediaPlayer!=null){
+                if(!isRecoding){
+                    initPlay();
                     visualizer.setEnabled(true);
                     mediaPlayer.start();
                 }
+
             }
         });
+        btn_recode=findViewById(R.id.btn_show);
+        btn_recode.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(isRecoding){
+                    isRecoding=false;
+                    recorderManager.stop();
+                    btn_recode.setText("录音");
+                }else {
+                    recorderManager=new RecordingUtil(getApplicationContext(),getFilesDir() + filePath);
+                    isRecoding=true;
+                    recorderManager.start();
+                    btn_recode.setText("停止录音");
+                }
+            }
+        });
+        chartView=findViewById(R.id.voice_view);
+        chartViewFFT=findViewById(R.id.fft_view);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if(recorderManager!=null){
+            recorderManager.stop();
+        }
         //销毁音频资源
         if (mediaPlayer != null && mediaPlayer.isPlaying()) {
             visualizer.setEnabled(false);
